@@ -381,18 +381,35 @@ public class WebServer {
         return map;
     }
 
+    // ===== 优先读取 Render Secret File，其次环境变量，最后本地 resources =====
     private static Sheets buildSheetsService() throws Exception {
-        String json = System.getenv("GOOGLE_SERVICE_ACCOUNT_JSON");
-        InputStream credentialsStream;
-        if (json != null && !json.isEmpty()) {
-            credentialsStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
-        } else {
-            // 本地开发回退：从 resources 读取
-            credentialsStream = WebServer.class.getResourceAsStream("/service-account.json");
-            if (credentialsStream == null) {
-                throw new RuntimeException("未设置 GOOGLE_SERVICE_ACCOUNT_JSON 环境变量，且找不到 service-account.json");
+        InputStream credentialsStream = null;
+
+        File secretFile = new File("/etc/secrets/service-account.json");
+        if (secretFile.exists()) {
+            credentialsStream = new FileInputStream(secretFile);
+            System.out.println("使用 Render Secret File: /etc/secrets/service-account.json");
+        }
+
+        if (credentialsStream == null) {
+            String json = System.getenv("GOOGLE_SERVICE_ACCOUNT_JSON");
+            if (json != null && !json.isEmpty()) {
+                credentialsStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
+                System.out.println("使用环境变量 GOOGLE_SERVICE_ACCOUNT_JSON");
             }
         }
+
+        if (credentialsStream == null) {
+            credentialsStream = WebServer.class.getResourceAsStream("/service-account.json");
+            if (credentialsStream != null) {
+                System.out.println("使用本地 resources/service-account.json");
+            }
+        }
+
+        if (credentialsStream == null) {
+            throw new RuntimeException("找不到服务账号凭据（Secret File / 环境变量 / resources 均无）");
+        }
+
         GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
                 .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
         return new Sheets.Builder(
