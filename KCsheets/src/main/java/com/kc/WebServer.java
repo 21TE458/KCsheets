@@ -40,7 +40,8 @@ public class WebServer {
         sheetsService = buildSheetsService();
         startSyncThread();
 
-        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
 
         // 首页
         server.createContext("/", exchange -> {
@@ -222,7 +223,7 @@ public class WebServer {
 
         server.setExecutor(null);
         server.start();
-        System.out.println("服务已启动：http://localhost:8080（监听 0.0.0.0）");
+        System.out.println("服务已启动：http://0.0.0.0:" + port);
         System.out.println("定时同步间隔：" + (SYNC_INTERVAL_MS / 1000) + " 秒");
     }
 
@@ -381,9 +382,16 @@ public class WebServer {
     }
 
     private static Sheets buildSheetsService() throws Exception {
-        InputStream credentialsStream = WebServer.class.getResourceAsStream("/service-account.json");
-        if (credentialsStream == null) {
-            throw new RuntimeException("找不到 service-account.json");
+        String json = System.getenv("GOOGLE_SERVICE_ACCOUNT_JSON");
+        InputStream credentialsStream;
+        if (json != null && !json.isEmpty()) {
+            credentialsStream = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
+        } else {
+            // 本地开发回退：从 resources 读取
+            credentialsStream = WebServer.class.getResourceAsStream("/service-account.json");
+            if (credentialsStream == null) {
+                throw new RuntimeException("未设置 GOOGLE_SERVICE_ACCOUNT_JSON 环境变量，且找不到 service-account.json");
+            }
         }
         GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
                 .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
