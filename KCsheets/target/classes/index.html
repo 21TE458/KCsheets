@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KCsheets 数据管理系统</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
+
+    .topbar { height: 52px; background: #1f2d3d; color: #fff; display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; gap: 10px; }
+    .topbar h1 { font-size: 16px; font-weight: 500; white-space: nowrap; }
+    .topbar .spacer { flex: 1; }
+    .topbar button { background: #3b82f6; border: none; color: #fff; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+    .topbar button:hover { background: #2563eb; }
+
+    .layout { flex: 1; display: flex; overflow: hidden; }
+
+    .sidebar { width: 240px; background: #fff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { padding: 12px 14px 10px; border-bottom: 1px solid #f0f0f0; }
+    .sidebar-header .title { font-size: 11px; color: #999; letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase; }
+    .year-select { width: 100%; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; outline: none; margin-bottom: 8px; }
+    .month-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+    .month-btn { padding: 5px 0; font-size: 11px; text-align: center; border: 1px solid #e5e7eb; border-radius: 3px; background: #fff; cursor: pointer; }
+    .month-btn.active { background: #e8f0fe; border-color: #3b82f6; color: #1a73e8; font-weight: 600; }
+    .sidebar-actions button { width: 100%; padding: 5px 0; font-size: 11px; border: 1px solid #e5e7eb; background: #fff; border-radius: 3px; cursor: pointer; color: #666; }
+    .sidebar-list { flex: 1; overflow-y: auto; }
+    .sidebar-list .item { padding: 8px 14px; font-size: 12px; cursor: pointer; border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #444; }
+    .sidebar-list .item:hover { background: #f9fafb; }
+    .sidebar-list .item.active { background: #e8f0fe; border-left-color: #3b82f6; color: #1a73e8; font-weight: 600; }
+    .sidebar-list .empty { padding: 16px 14px; font-size: 12px; color: #999; }
+
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    .mobile-sheet-bar { display: none; padding: 8px 14px; background: #fff; border-bottom: 1px solid #e5e7eb; }
+    .mobile-sheet-bar select { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; }
+
+    .stats-bar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 8px 16px; display: flex; gap: 20px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-item .label { font-size: 10px; color: #999; }
+    .stat-item .value { font-size: 16px; font-weight: 600; color: #1f2d3d; }
+    .stat-divider { width: 1px; height: 26px; background: #e5e7eb; }
+    .stat-summary { font-size: 12px; color: #555; display: flex; gap: 12px; flex-wrap: wrap; }
+    .stat-summary span b { color: #1a73e8; }
+    .stat-toggle { margin-left: auto; font-size: 12px; color: #3b82f6; background: none; border: none; cursor: pointer; }
+    .stat-detail { background: #fafbfc; border-bottom: 1px solid #e5e7eb; padding: 8px 16px; font-size: 12px; color: #555; flex-wrap: wrap; gap: 8px 18px; }
+    .stat-detail span b { color: #1a73e8; }
+
+    .toolbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+    .toolbar .sheet-name { font-size: 14px; font-weight: 600; white-space: nowrap; color: #1f2d3d; }
+    .toolbar .search-box { flex: 1; min-width: 140px; max-width: 280px; }
+    .toolbar .search-box input { width: 100%; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; outline: none; }
+    .toolbar .view-toggle { display: flex; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; }
+    .toolbar .view-toggle button { padding: 6px 12px; font-size: 12px; background: #fff; border: none; cursor: pointer; color: #555; }
+    .toolbar .view-toggle button.active { background: #3b82f6; color: #fff; }
+    .toolbar .clear-btn { font-size: 12px; color: #3b82f6; background: none; border: none; cursor: pointer; white-space: nowrap; }
+    .toolbar .status { font-size: 11px; color: #f59e0b; }
+    .toolbar .status.error { color: #dc2626; }
+
+    .outbound-bar { background: #fff7ed; border-bottom: 1px solid #fed7aa; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+    .outbound-bar label { font-size: 11px; color: #92400e; white-space: nowrap; }
+    .outbound-bar select { padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; max-width: 180px; }
+    .outbound-bar button { background: #ea580c; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .outbound-bar button:hover { background: #c2410c; }
+    .outbound-bar button:disabled { opacity: .5; cursor: not-allowed; }
+    .outbound-result { font-size: 11px; color: #555; width: 100%; }
+
+    .detail-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+    .content { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 100%; }
+    th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 12px; text-align: left; white-space: nowrap; }
+    th { background: #f9fafb; position: sticky; top: 0; z-index: 2; font-weight: 600; font-size: 12px; color: #555; border-bottom: 1px solid #e5e7eb; }
+    tr:nth-child(even) td { background: #fcfcfd; }
+    td.editable { cursor: text; }
+    td.editable:hover { background: #f0f7ff; }
+    td.pending { background: #fef3c7 !important; }
+
+    .pager { height: 44px; background: #fff; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; gap: 10px; flex-shrink: 0; font-size: 12px; }
+    .pager button { padding: 5px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 4px; cursor: pointer; }
+    .pager button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .empty { padding: 60px 0; text-align: center; color: #999; font-size: 13px; }
+
+    /* 分组视图 */
+    .group-view { display: none; flex: 1; overflow: auto; padding: 12px; }
+    .group-view.active { display: block; }
+    .flat-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .flat-view.hidden { display: none; }
+    .group-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 12px; overflow: hidden; }
+    .group-card-header { padding: 10px 14px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .group-card-header .g-key { font-size: 13px; font-weight: 600; color: #1f2d3d; }
+    .group-card-header .g-count { font-size: 11px; color: #888; margin-left: auto; }
+    .group-card-body { max-height: 480px; overflow: auto; }
+    .group-card-body table { min-width: 0; }
+    .group-card-body th, .group-card-body td { padding: 6px 10px; font-size: 12px; }
+
+    @media screen and (max-width: 768px) {
+        .layout { flex-direction: column; }
+        .sidebar { display: none; }
+        .mobile-sheet-bar { display: block; }
+        .topbar h1 { font-size: 15px; }
+        .stats-bar { gap: 10px; padding: 8px 12px; }
+        .stat-item .value { font-size: 15px; }
+        .stat-summary { width: 100%; }
+        .toolbar .sheet-name { display: none; }
+        .content { padding: 0; }
+        table { font-size: 12px; }
+        th, td { padding: 6px 8px; }
+        .outbound-bar select { max-width: 100%; flex: 1; }
+        .pager { height: 40px; }
+        .pager button { padding: 5px 10px; font-size: 12px; }
+        .group-view { padding: 8px; }
+        .group-card-body { max-height: 360px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <h1>KCsheets 数据管理系统</h1>
+    <div class="spacer"></div>
+    <button id="refreshBtn">刷新</button>
+</div>
+
+<div class="layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="title">工作表</div>
+            <select id="yearSelect" class="year-select">
+                <option value="">全部年份</option>
+            </select>
+            <div class="month-grid" id="monthGrid"></div>
+            <div class="sidebar-actions">
+                <button id="clearDateBtn">清除日期</button>
+            </div>
+        </div>
+        <div class="sidebar-list" id="sheetList"></div>
+    </aside>
+
+    <section class="main">
+
+        <div class="mobile-sheet-bar">
+            <select id="mobileSheetSelect"></select>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item"><span class="label">总行数</span><span class="value" id="statRows">-</span></div>
+            <div class="stat-item"><span class="label">总列数</span><span class="value" id="statCols">-</span></div>
+            <div class="stat-item"><span class="label">分组数</span><span class="value" id="statGroups">-</span></div>
+            <div class="stat-divider"></div>
+            <div class="stat-summary" id="statSummary">选择工作表后显示汇总</div>
+            <button class="stat-toggle" id="statToggle" style="display:none;">展开明细</button>
+        </div>
+        <div class="stat-detail" id="statDetail" style="display:none;"></div>
+
+        <div class="outbound-bar">
+            <label>出库表：</label>
+            <select id="outboundSheetSelect"></select>
+            <label>库存表：</label>
+            <select id="inventorySheetSelect"></select>
+            <button id="outboundBtn">执行出库减数</button>
+            <div class="outbound-result" id="outboundResult"></div>
+        </div>
+
+        <div class="toolbar">
+            <span class="sheet-name" id="currentSheet">请选择工作表</span>
+            <div class="search-box">
+                <input id="globalSearch" type="text" placeholder="全局搜索..." disabled>
+            </div>
+            <div class="view-toggle">
+                <button id="viewFlatBtn" class="active">表格</button>
+                <button id="viewGroupBtn">分组</button>
+            </div>
+            <select id="groupKeywordSelect" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;display:none;">
+                <option value="仕入先">仕入先</option>
+                <option value="商品コード">商品コード</option>
+                <option value="入荷日">入荷日</option>
+                <option value="メーカー">メーカー</option>
+                <option value="JANCODE">JANCODE</option>
+            </select>
+            <button class="clear-btn" id="clearBtn" disabled>清除筛选</button>
+            <button class="clear-btn" id="syncBtn" disabled>手动同步</button>
+            <button class="clear-btn" id="saveBtn" disabled style="color:#059669;font-weight:600;">保存修改</button>
+            <span class="status" id="status"></span>
+            <span class="status" id="lastSyncTime" style="color:#999;"></span>
+        </div>
+
+        <div class="flat-view" id="flatView">
+            <div class="content" id="content">
+                <div class="empty">从左侧选择工作表以查看数据</div>
+            </div>
+            <div class="pager">
+                <button id="prevBtn" disabled>上一页</button>
+                <span class="page-info" id="pageInfo"></span>
+                <button id="nextBtn" disabled>下一页</button>
+            </div>
+        </div>
+
+        <div class="group-view" id="groupView"></div>
+    </section>
+</div>
+
+<script>
+    const PAGE_SIZE = 50;
+    const IGNORE_ROW_VALUES = ['KC JAPAN'];
+
+    let sheetListData = [];
+    let allRows = [];
+    let filteredRows = [];
+    let currentSheet = '';
+    let currentPage = 1;
+    let headers = [];
+    let columnFilters = [];
+    let globalKeyword = '';
+    let selectedMonths = new Set();
+    let pendingChanges = new Map();
+    let groupColumnName = '仕入先';
+    let currentView = 'flat';
+    let collapsedGroups = new Set();
+
+    const sheetListEl = document.getElementById('sheetList');
+    const yearSelectEl = document.getElementById('yearSelect');
+    const monthGridEl = document.getElementById('monthGrid');
+    const currentSheetEl = document.getElementById('currentSheet');
+    const statusEl = document.getElementById('status');
+    const contentEl = document.getElementById('content');
+    const pageInfoEl = document.getElementById('pageInfo');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const globalSearchEl = document.getElementById('globalSearch');
+    const clearBtn = document.getElementById('clearBtn');
+    const statRowsEl = document.getElementById('statRows');
+    const statColsEl = document.getElementById('statCols');
+    const statGroupsEl = document.getElementById('statGroups');
+    const statSummaryEl = document.getElementById('statSummary');
+    const statToggleEl = document.getElementById('statToggle');
+    const statDetailEl = document.getElementById('statDetail');
+    const mobileSheetSelect = document.getElementById('mobileSheetSelect');
+    const outboundSheetSelect = document.getElementById('outboundSheetSelect');
+    const inventorySheetSelect = document.getElementById('inventorySheetSelect');
+    const outboundBtn = document.getElementById('outboundBtn');
+    const outboundResultEl = document.getElementById('outboundResult');
+    const syncBtn = document.getElementById('syncBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const lastSyncTimeEl = document.getElementById('lastSyncTime');
+    const flatViewEl = document.getElementById('flatView');
+    const groupViewEl = document.getElementById('groupView');
+    const viewFlatBtn = document.getElementById('viewFlatBtn');
+    const viewGroupBtn = document.getElementById('viewGroupBtn');
+    const groupKeywordSelect = document.getElementById('groupKeywordSelect');
+
+    function parseYearMonth(title) {
+        const m = title.match(/(\d{4})[\/\-年](\d{1,2})/);
+        if (m) return { year: parseInt(m[1]), month: parseInt(m[2]) };
+        return null;
+    }
+
+    function initMonthGrid() {
+        for (let m = 1; m <= 12; m++) {
+            const btn = document.createElement('div');
+            btn.className = 'month-btn';
+            btn.textContent = m + '月';
+            btn.dataset.month = m;
+            btn.onclick = () => {
+                if (selectedMonths.has(m)) selectedMonths.delete(m);
+                else selectedMonths.add(m);
+                refreshMonthButtons();
+                renderSheetList();
+            };
+            monthGridEl.appendChild(btn);
+        }
+    }
+
+    function refreshMonthButtons() {
+        document.querySelectorAll('.month-btn').forEach(btn => {
+            btn.classList.toggle('active', selectedMonths.has(parseInt(btn.dataset.month)));
+        });
+    }
+
+    viewFlatBtn.onclick = () => switchView('flat');
+    viewGroupBtn.onclick = () => switchView('group');
+
+    function switchView(v) {
+        currentView = v;
+        viewFlatBtn.classList.toggle('active', v === 'flat');
+        viewGroupBtn.classList.toggle('active', v === 'group');
+        groupKeywordSelect.style.display = v === 'group' ? 'inline-block' : 'none';
+        flatViewEl.classList.toggle('hidden', v !== 'flat');
+        groupViewEl.classList.toggle('active', v === 'group');
+        if (v === 'group') renderGroupView();
+    }
+
+    groupKeywordSelect.onchange = () => {
+        groupColumnName = groupKeywordSelect.value;
+        collapsedGroups.clear();
+        if (currentView === 'group') renderGroupView();
+        updateStats();
+    };
+
+    function loadSheets() {
+        statusEl.textContent = '加载工作表...';
+        fetch('/api/sheets')
+            .then(r => r.json())
+            .then(list => {
+                statusEl.textContent = '';
+                sheetListData = Array.isArray(list) ? list : [];
+                fillYearSelect();
+                fillSelects();
+                renderSheetList();
+                if (sheetListData.length) selectSheet(sheetListData[0].title);
+            })
+            .catch(err => {
+                statusEl.textContent = '加载失败：' + err.message;
+                statusEl.className = 'status error';
+            });
+    }
+
+    function fillYearSelect() {
+        const years = new Set();
+        sheetListData.forEach(s => {
+            const ym = parseYearMonth(s.title);
+            if (ym) years.add(ym.year);
+        });
+        yearSelectEl.innerHTML = '<option value="">全部年份</option>';
+        Array.from(years).sort().forEach(y => {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y + '年';
+            yearSelectEl.appendChild(opt);
+        });
+        yearSelectEl.onchange = renderSheetList;
+    }
+
+    function fillSelects() {
+        const fill = (sel) => {
+            sel.innerHTML = '';
+            sheetListData.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.title;
+                opt.textContent = s.title;
+                sel.appendChild(opt);
+            });
+        };
+        fill(mobileSheetSelect);
+        fill(outboundSheetSelect);
+        fill(inventorySheetSelect);
+    }
+
+    mobileSheetSelect.onchange = () => selectSheet(mobileSheetSelect.value);
+
+    function renderSheetList() {
+        const year = yearSelectEl.value ? parseInt(yearSelectEl.value) : null;
+        const matched = sheetListData.filter(s => {
+            const ym = parseYearMonth(s.title);
+            if (!ym) return !year && selectedMonths.size === 0;
+            if (year && ym.year !== year) return false;
+            if (selectedMonths.size > 0 && !selectedMonths.has(ym.month)) return false;
+            return true;
+        });
+        sheetListEl.innerHTML = '';
+        if (!matched.length) {
+            sheetListEl.innerHTML = '<div class="empty">没有匹配的工作表</div>';
+            return;
+        }
+        matched.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'item' + (item.title === currentSheet ? ' active' : '');
+            div.textContent = item.title;
+            div.title = item.title;
+            div.onclick = () => selectSheet(item.title);
+            sheetListEl.appendChild(div);
+        });
+    }
+
+    document.getElementById('clearDateBtn').onclick = () => {
+        selectedMonths.clear();
+        yearSelectEl.value = '';
+        refreshMonthButtons();
+        renderSheetList();
+    };
+
+    function selectSheet(name) {
+        currentSheet = name;
+        currentPage = 1;
+        columnFilters = [];
+        globalKeyword = '';
+        globalSearchEl.value = '';
+        currentSheetEl.textContent = name;
+        mobileSheetSelect.value = name;
+        syncBtn.disabled = false;
+        pendingChanges.clear();
+        collapsedGroups.clear();
+        updateSaveBtn();
+        renderSheetList();
+        loadData();
+    }
+
+    function loadData() {
+        statusEl.textContent = '加载数据...';
+        statusEl.className = 'status';
+        contentEl.innerHTML = '';
+        resetStats();
+        fetch('/api/data?sheet=' + encodeURIComponent(currentSheet) + '&maxRows=500')
+            .then(r => r.json())
+            .then(rows => {
+                if (rows.error) throw new Error(rows.error);
+                allRows = rows;
+                headers = allRows.length ? allRows[0].map(h => h == null ? '' : String(h)) : [];
+                columnFilters = new Array(headers.length).fill('');
+                statusEl.textContent = '';
+                globalSearchEl.disabled = false;
+                clearBtn.disabled = false;
+                applyFilters();
+            })
+            .catch(err => {
+                statusEl.textContent = '加载失败：' + err.message;
+                statusEl.className = 'status error';
+                contentEl.innerHTML = '<div class="empty">加载失败</div>';
+            });
+    }
+
+    function applyFilters() {
+        const dataRows = allRows.slice(1);
+        const kw = globalKeyword.trim().toLowerCase();
+        filteredRows = dataRows.filter(row => {
+            if (kw) {
+                const hit = row.some(cell => String(cell == null ? '' : cell).toLowerCase().includes(kw));
+                if (!hit) return false;
+            }
+            for (let i = 0; i < columnFilters.length; i++) {
+                const f = columnFilters[i].trim().toLowerCase();
+                if (!f) continue;
+                const cellVal = String(row[i] == null ? '' : row[i]).toLowerCase();
+                if (!cellVal.includes(f)) return false;
+            }
+            return true;
+        });
+        filteredRows = filteredRows.filter(row => !isIgnoredRow(row));
+        currentPage = 1;
+        updateStats();
+        renderFlat();
+        if (currentView === 'group') renderGroupView();
+    }
+
+    function isIgnoredRow(row) {
+        const nonEmpty = row
+            .map(cell => String(cell == null ? '' : cell).trim())
+            .filter(v => v !== '');
+        if (nonEmpty.length === 0) return true;
+        if (nonEmpty.length !== 1) return false;
+        const only = nonEmpty[0].toUpperCase();
+        return IGNORE_ROW_VALUES.some(v => v.toUpperCase() === only);
+    }
+
+    function resetStats() {
+        statRowsEl.textContent = '-';
+        statColsEl.textContent = '-';
+        statGroupsEl.textContent = '-';
+        statSummaryEl.textContent = '选择工作表后显示汇总';
+        statDetailEl.style.display = 'none';
+        statDetailEl.innerHTML = '';
+        statToggleEl.style.display = 'none';
+        statToggleEl.onclick = null;
+    }
+
+    function updateStats() {
+        if (!headers.length) { resetStats(); return; }
+        statRowsEl.textContent = filteredRows.length;
+        statColsEl.textContent = headers.length;
+        statGroupsEl.textContent = buildGroups().length;
+        const colStats = headers.map((h, i) => {
+            let nonEmpty = 0, sum = 0, numericCount = 0;
+            filteredRows.forEach(row => {
+                const v = row[i];
+                if (v == null || v === '') return;
+                nonEmpty++;
+                const n = Number(String(v).replace(/,/g, ''));
+                if (!isNaN(n) && String(v).trim() !== '') { sum += n; numericCount++; }
+            });
+            const isMoney = /金額|金额|価格|价格|単価|合计|合計|total|amount|price|在庫|库存/i.test(h);
+            return { header: h, nonEmpty, sum, numericCount, isMoney };
+        });
+        const moneyStats = colStats.filter(c => c.isMoney && c.numericCount > 0);
+        if (moneyStats.length) {
+            statSummaryEl.innerHTML = moneyStats.map(c =>
+                '<span>' + escapeHtml(c.header) + ' 合计：<b>' + c.sum.toLocaleString() + '</b></span>'
+            ).join('');
+        } else {
+            statSummaryEl.textContent = '（无金额/库存类列，点右侧查看明细）';
+        }
+        statDetailEl.innerHTML = colStats.map(c =>
+            '<span>' + escapeHtml(c.header) + ' 非空：<b>' + c.nonEmpty + '</b></span>'
+        ).join('');
+        statToggleEl.style.display = 'inline';
+        statToggleEl.textContent = '展开明细';
+        statDetailEl.style.display = 'none';
+        statToggleEl.onclick = () => {
+            const open = statDetailEl.style.display !== 'none';
+            statDetailEl.style.display = open ? 'none' : 'flex';
+            statToggleEl.textContent = open ? '展开明细' : '收起明细';
+        };
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function getGroupColumnIndex() {
+        return headers.findIndex(h => h && h.trim() === groupColumnName);
+    }
+
+    function buildGroups() {
+        const idx = getGroupColumnIndex();
+        if (idx < 0) {
+            return [{ key: '全部', rows: filteredRows.map((r, i) => ({ row: r, actualRow: i + 2 })) }];
+        }
+        const map = new Map();
+        filteredRows.forEach((row, i) => {
+            const raw = String(row[idx] == null ? '' : row[idx]).trim();
+            if (!raw) return;
+            if (!map.has(raw)) map.set(raw, []);
+            map.get(raw).push({ row, actualRow: i + 2 });
+        });
+        return Array.from(map.entries()).map(([key, items]) => ({ key, rows: items }));
+    }
+
+    // ===== 平铺表格视图 =====
+    function renderFlat() {
+        contentEl.innerHTML = '';
+        if (!allRows.length) {
+            contentEl.innerHTML = '<div class="empty">该工作表没有数据</div>';
+            pageInfoEl.textContent = '';
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            return;
+        }
+        const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const pageRows = filteredRows.slice(start, start + PAGE_SIZE);
+
+        const table = document.createElement('table');
+        const headRow = document.createElement('tr');
+        headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            headRow.appendChild(th);
+        });
+        table.appendChild(headRow);
+
+        pageRows.forEach((row, rowIdx) => {
+            const tr = document.createElement('tr');
+            const actualRow = start + rowIdx + 2;
+            headers.forEach((_, colIdx) => {
+                const td = document.createElement('td');
+                const actualCol = colIdx + 1;
+                const key = actualRow + '-' + actualCol;
+                td.className = 'editable';
+                td.textContent = row[colIdx] == null ? '' : row[colIdx];
+                td.title = '点击编辑';
+                if (pendingChanges.has(key)) {
+                    td.textContent = pendingChanges.get(key).value;
+                    td.classList.add('pending');
+                }
+                td.onclick = () => startEditCell(td, actualRow, actualCol);
+                tr.appendChild(td);
+            });
+            table.appendChild(tr);
+        });
+        contentEl.appendChild(table);
+
+        pageInfoEl.textContent = '第 ' + currentPage + ' / ' + totalPages + ' 页';
+        prevBtn.disabled = currentPage <= 1;
+        nextBtn.disabled = currentPage >= totalPages;
+    }
+
+    // ===== 分组视图 =====
+    function renderGroupView() {
+        const groups = buildGroups();
+        groupViewEl.innerHTML = '';
+        if (!groups.length) {
+            groupViewEl.innerHTML = '<div class="empty">没有数据</div>';
+            return;
+        }
+        groups.forEach(g => {
+            const card = document.createElement('div');
+            card.className = 'group-card';
+
+            const header = document.createElement('div');
+            header.className = 'group-card-header';
+            const keyEl = document.createElement('span');
+            keyEl.className = 'g-key';
+            keyEl.textContent = g.key;
+            const countEl = document.createElement('span');
+            countEl.className = 'g-count';
+            const isCollapsed = collapsedGroups.has(g.key);
+            countEl.textContent = g.rows.length + ' 条记录 ' + (isCollapsed ? '▸' : '▾');
+            header.appendChild(keyEl);
+            header.appendChild(countEl);
+            header.onclick = () => {
+                if (collapsedGroups.has(g.key)) collapsedGroups.delete(g.key);
+                else collapsedGroups.add(g.key);
+                renderGroupView();
+            };
+            card.appendChild(header);
+
+            if (!isCollapsed) {
+                const body = document.createElement('div');
+                body.className = 'group-card-body';
+                const table = document.createElement('table');
+                const headRow = document.createElement('tr');
+                headers.forEach(h => {
+                    const th = document.createElement('th');
+                    th.textContent = h;
+                    headRow.appendChild(th);
+                });
+                table.appendChild(headRow);
+
+                g.rows.forEach(({ row, actualRow }) => {
+                    const tr = document.createElement('tr');
+                    headers.forEach((_, colIdx) => {
+                        const td = document.createElement('td');
+                        const actualCol = colIdx + 1;
+                        const key = actualRow + '-' + actualCol;
+                        td.className = 'editable';
+                        td.textContent = row[colIdx] == null ? '' : row[colIdx];
+                        if (pendingChanges.has(key)) {
+                            td.textContent = pendingChanges.get(key).value;
+                            td.classList.add('pending');
+                        }
+                        td.onclick = () => startEditCell(td, actualRow, actualCol);
+                        tr.appendChild(td);
+                    });
+                    table.appendChild(tr);
+                });
+                body.appendChild(table);
+                card.appendChild(body);
+            }
+            groupViewEl.appendChild(card);
+        });
+    }
+
+    function startEditCell(td, row, col) {
+        if (td.querySelector('input')) return;
+        const oldValue = td.textContent;
+        td.innerHTML = '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = oldValue;
+        input.style.width = '100%';
+        input.style.border = '1px solid #3b82f6';
+        input.style.padding = '2px 4px';
+        input.style.fontSize = '13px';
+        td.appendChild(input);
+        input.focus();
+        input.select();
+
+        let done = false;
+        const finish = (commit) => {
+            if (done) return;
+            done = true;
+            const newValue = input.value;
+            td.textContent = commit ? newValue : oldValue;
+            const key = row + '-' + col;
+            if (commit && newValue !== oldValue) {
+                pendingChanges.set(key, { row, col, value: newValue });
+                td.classList.add('pending');
+            } else {
+                pendingChanges.delete(key);
+                td.classList.remove('pending');
+            }
+            updateSaveBtn();
+        };
+
+        input.onblur = () => finish(true);
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        };
+    }
+
+    function updateSaveBtn() {
+        saveBtn.disabled = pendingChanges.size === 0;
+        saveBtn.textContent = pendingChanges.size > 0
+            ? '保存修改（' + pendingChanges.size + '）'
+            : '保存修改';
+    }
+
+    saveBtn.onclick = () => {
+        if (!currentSheet || pendingChanges.size === 0) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = '保存中...';
+        const updates = Array.from(pendingChanges.values());
+        fetch('/api/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sheet: currentSheet, updates: updates })
+        })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) throw new Error(res.error);
+                pendingChanges.clear();
+                updateSaveBtn();
+                loadData();
+                alert('已保存 ' + res.count + ' 处修改');
+            })
+            .catch(err => {
+                alert('保存失败：' + err.message);
+                updateSaveBtn();
+            })
+            .finally(() => { saveBtn.textContent = '保存修改'; });
+    };
+
+    prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderFlat(); } };
+    nextBtn.onclick = () => { currentPage++; renderFlat(); };
+    globalSearchEl.addEventListener('input', () => { globalKeyword = globalSearchEl.value; applyFilters(); });
+    clearBtn.onclick = () => {
+        globalKeyword = '';
+        globalSearchEl.value = '';
+        columnFilters = columnFilters.map(() => '');
+        applyFilters();
+    };
+    document.getElementById('refreshBtn').onclick = () => { if (currentSheet) loadData(); else loadSheets(); };
+
+    function syncNow(silent) {
+        if (!currentSheet) return;
+        if (!silent) { syncBtn.disabled = true; syncBtn.textContent = '同步中...'; }
+        fetch('/api/sync?sheet=' + encodeURIComponent(currentSheet))
+            .then(r => r.json())
+            .then(() => {
+                lastSyncTimeEl.textContent = '上次同步：' + new Date().toLocaleTimeString();
+                if (!silent) loadData();
+            })
+            .catch(err => { if (!silent) alert('同步失败：' + err.message); })
+            .finally(() => { if (!silent) { syncBtn.disabled = false; syncBtn.textContent = '手动同步'; } });
+    }
+    syncBtn.onclick = () => syncNow(false);
+
+    setInterval(() => { if (currentSheet) syncNow(true); }, 30000);
+
+    outboundBtn.onclick = () => {
+        const outSheet = outboundSheetSelect.value;
+        const invSheet = inventorySheetSelect.value;
+        if (!outSheet || !invSheet) { outboundResultEl.textContent = '请选择出库表和库存表'; return; }
+        if (!confirm('确定执行出库减数？\n出库表：' + outSheet + '\n库存表：' + invSheet)) return;
+        outboundBtn.disabled = true;
+        outboundResultEl.textContent = '执行中...';
+        fetch('/api/outbound?outboundSheet=' + encodeURIComponent(outSheet) + '&inventorySheet=' + encodeURIComponent(invSheet))
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) throw new Error(res.error);
+                outboundResultEl.innerHTML = '成功 ' + res.successCount + ' 条，失败 ' + res.failCount + ' 条。' +
+                    '<br>' + (res.details || []).map(d =>
+                        escapeHtml(d.code) + '：' + escapeHtml(d.status) + ' ' + escapeHtml(d.reason || '')
+                    ).join('<br>');
+                if (currentSheet === invSheet) loadData();
+            })
+            .catch(err => { outboundResultEl.textContent = '执行失败：' + err.message; })
+            .finally(() => { outboundBtn.disabled = false; });
+    };
+
+    initMonthGrid();
+    loadSheets();
+</script>
+</body>
+</html>
